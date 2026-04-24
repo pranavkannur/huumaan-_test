@@ -1,65 +1,181 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { Sparkles, Copy, Check, Wand2, ChevronDown } from "lucide-react";
+
+const MODELS = [
+  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", tag: "Best" },
+  { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", tag: "Fast" },
+  { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite", tag: "Fastest" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", tag: "Stable" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tag: "Stable" },
+];
 
 export default function Home() {
+  const [inputText, setInputText] = useState("");
+  const [outputText, setOutputText] = useState("");
+  const [tone, setTone] = useState("Natural");
+  const [selectedModel, setSelectedModel] = useState("gemini-3.1-pro-preview");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [showModelMenu, setShowModelMenu] = useState(false);
+
+  const handleHumanize = async () => {
+    if (!inputText.trim()) return;
+
+    setLoading(true);
+    setError("");
+    setOutputText("");
+
+    try {
+      const response = await fetch("/api/humanize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: inputText, tone, model: selectedModel }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Something went wrong.");
+      }
+
+      setOutputText(data.humanizedText);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopy = () => {
+    if (!outputText) return;
+    navigator.clipboard.writeText(outputText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const tones = ["Natural", "Professional", "Casual", "Creative"];
+  const currentModel = MODELS.find((m) => m.id === selectedModel);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="main-container">
+      <header>
+        <h1>AI Text Humanizer</h1>
+        <p>Breathe life into your AI-generated content</p>
+      </header>
+
+      <div className="app-layout">
+        {/* Input Area */}
+        <div className="glass-panel textarea-container">
+          <div className="textarea-header">
+            <h2>Input Text</h2>
+            {/* Model Selector */}
+            <div className="model-selector-wrapper">
+              <button
+                className="model-selector-btn"
+                onClick={() => setShowModelMenu(!showModelMenu)}
+                disabled={loading}
+              >
+                <span className="model-label">{currentModel?.label}</span>
+                <span className="model-tag">{currentModel?.tag}</span>
+                <ChevronDown size={14} />
+              </button>
+              {showModelMenu && (
+                <div className="model-dropdown">
+                  {MODELS.map((m) => (
+                    <button
+                      key={m.id}
+                      className={`model-option ${selectedModel === m.id ? "active" : ""}`}
+                      onClick={() => {
+                        setSelectedModel(m.id);
+                        setShowModelMenu(false);
+                      }}
+                    >
+                      <span className="model-option-label">{m.label}</span>
+                      <span className="model-option-tag">{m.tag}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <textarea
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Paste your AI-generated text here..."
+            disabled={loading}
+          />
+          <div className="controls-bar">
+            <div className="tone-selector">
+              {tones.map((t) => (
+                <button
+                  key={t}
+                  className={`tone-btn ${tone === t ? "active" : ""}`}
+                  onClick={() => setTone(t)}
+                  disabled={loading}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <button
+              className={`action-btn ${loading ? "loading" : ""}`}
+              onClick={handleHumanize}
+              disabled={loading || !inputText.trim()}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              {loading ? (
+                <>
+                  <Wand2 className="spin-icon" size={18} />
+                  Humanizing...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} />
+                  Humanize Text
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Output Area */}
+        <div className="glass-panel textarea-container output-container">
+          <div className="textarea-header">
+            <h2>Humanized Result</h2>
+            <button
+              className="copy-btn"
+              onClick={handleCopy}
+              disabled={!outputText}
+              title="Copy to clipboard"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              {copied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+
+          {error && <div className="error-message">{error}</div>}
+
+          {loading ? (
+            <div className="empty-state">
+              <div className="typing-indicator">
+                <div className="typing-dot"></div>
+                <div className="typing-dot"></div>
+                <div className="typing-dot"></div>
+              </div>
+              <p>Rewriting to sound more human...</p>
+            </div>
+          ) : outputText ? (
+            <div className="output-text">{outputText}</div>
+          ) : (
+            <div className="empty-state">
+              <Sparkles size={48} />
+              <p>Your natural-sounding text will appear here</p>
+            </div>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
